@@ -5,43 +5,75 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Chat with OpenAI (via OpenRouter)</title>
   <style>
-    /* Basic styling for the chat interface */
+    /* General layout and background */
     body {
-      font-family: Arial, sans-serif;
-      padding: 10px;
-      background-color: #f9f9f9;
+      font-family: 'Arial', sans-serif;
+      background-color: #f1f1f1;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
     }
+
     #chatbox {
       width: 100%;
       max-width: 600px;
-      margin: 0 auto;
-      background-color: white;
-      border-radius: 8px;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      height: 80vh;
       padding: 20px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
+
     #chatHistory {
-      max-height: 400px;
+      flex-grow: 1;
       overflow-y: auto;
       margin-bottom: 20px;
+      padding-right: 10px;
     }
-    input[type="text"] {
-      width: 80%;
+
+    .message {
+      max-width: 70%;
       padding: 10px;
-      margin-right: 10px;
-      border-radius: 4px;
+      margin-bottom: 10px;
+      border-radius: 15px;
+      word-wrap: break-word;
+    }
+
+    .user-message {
+      background-color: #d3f8e2;
+      align-self: flex-end;
+      text-align: right;
+    }
+
+    .bot-message {
+      background-color: #f1f1f1;
+      align-self: flex-start;
+      text-align: left;
+    }
+
+    #userInput {
+      width: 100%;
+      padding: 15px;
+      border-radius: 25px;
       border: 1px solid #ccc;
+      font-size: 16px;
+      outline: none;
+      margin-top: 10px;
+      transition: all 0.3s;
     }
+
+    #userInput:focus {
+      border-color: #4CAF50;
+    }
+
     button {
-      padding: 10px 20px;
-      border: none;
-      background-color: #4CAF50;
-      color: white;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #45a049;
+      display: none; /* Hide the button as 'Enter' is used */
     }
   </style>
 </head>
@@ -49,8 +81,7 @@
 
   <div id="chatbox">
     <div id="chatHistory"></div>
-    <input type="text" id="userInput" placeholder="Ask me anything..." />
-    <button onclick="sendMessage()">Send</button>
+    <input type="text" id="userInput" placeholder="Ask me anything..." onkeydown="checkEnter(event)" />
   </div>
 
   <script>
@@ -59,8 +90,11 @@
     const OpenRouterAPIKey = Qualtrics.SurveyEngine.getEmbeddedData("OpenRouterAPIKey");
     const OpenAIEndpoint = Qualtrics.SurveyEngine.getEmbeddedData("OpenAIEndpoint");
 
+    // Initialize an empty chat history array (you can store more details as needed)
+    let chatHistory = [];
+
     // This function saves the chat history as embedded data in Qualtrics
-    function saveChatHistory(chatHistory) {
+    function saveChatHistory() {
       Qualtrics.SurveyEngine.setEmbeddedData("chatHistory", JSON.stringify(chatHistory));
     }
 
@@ -79,7 +113,7 @@
       updateChatHistory("Bot", response);
 
       // Save the updated chat history to Qualtrics
-      saveChatHistory(chatHistory);
+      saveChatHistory();
 
       // Clear the input field
       document.getElementById("userInput").value = "";
@@ -88,7 +122,15 @@
     // Function to update chat history on the UI
     function updateChatHistory(sender, message) {
       const chatHistoryDiv = document.getElementById("chatHistory");
-      chatHistoryDiv.innerHTML += `<p><strong>${sender}:</strong> ${message}</p>`;
+      chatHistory.push({ sender, message }); // Add to the chat history array
+      chatHistoryDiv.innerHTML = ''; // Clear previous content
+      chatHistory.forEach(chat => {
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message');
+        messageDiv.classList.add(chat.sender === "You" ? 'user-message' : 'bot-message');
+        messageDiv.innerHTML = `<strong>${chat.sender}:</strong> ${chat.message}`;
+        chatHistoryDiv.appendChild(messageDiv);
+      });
       chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight; // Scroll to the latest message
     }
 
@@ -110,8 +152,13 @@
       return data.reply; // The reply from OpenAI (via OpenRouter)
     }
 
-    // Initialize an empty chat history array (you can store more details as needed)
-    const chatHistory = [];
+    // Check if the 'Enter' key was pressed and trigger sendMessage
+    function checkEnter(event) {
+      if (event.key === 'Enter') {
+        event.preventDefault(); // Prevent form submission on Enter key
+        sendMessage();
+      }
+    }
   </script>
 
 </body>
