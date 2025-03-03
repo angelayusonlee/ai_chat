@@ -9,7 +9,6 @@
         #chatbox { width: 90%; height: 400px; border: 1px solid #ccc; padding: 10px; overflow-y: auto; text-align: left; margin: auto; }
         #userInput { width: 70%; padding: 8px; }
         button { padding: 8px; margin-left: 5px; }
-        #exportBtn { margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
@@ -18,7 +17,6 @@
 <div id="chatbox"></div>
 <input type="text" id="userInput" placeholder="Type your message...">
 <button onclick="sendMessage()">Send</button>
-<button id="exportBtn" onclick="exportChat()">Export Chat</button>
 
 <script>
     const apiKey = "YOUR_OPENAI_API_KEY";  // 🔴 Replace with your OpenAI API key
@@ -60,21 +58,14 @@
         chatHistory.push({ role: "assistant", content: aiReply });
         displayMessage("AI", aiReply);
 
-        // Show Export Button after conversation starts
-        document.getElementById("exportBtn").style.display = "block";
+        // Send chat history to Qualtrics
+        sendToQualtrics();
     }
 
-    function exportChat() {
-        const chatData = {
-            participantID: participantID,
-            history: chatHistory
-        };
-
-        const blob = new Blob([JSON.stringify(chatData, null, 2)], { type: "application/json" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `chat_history_${participantID}.json`;
-        a.click();
+    function sendToQualtrics() {
+        if (window.parent && window.parent.postMessage) {
+            window.parent.postMessage({ ChatHistory: JSON.stringify(chatHistory) }, "*");
+        }
     }
 </script>
 
