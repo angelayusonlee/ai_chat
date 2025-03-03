@@ -81,7 +81,9 @@
     let chatHistory = [];
 
     // Get the embedded participant ID and store it
-    const participantId = "${e://Field/participantId}";  // Replace with embedded participant variable
+    //const participantId = "${e://Field/participantId}";  // Replace with embedded participant variable
+    const participantId = new URLSearchParams(window.location.search).get("participantId");
+
 
     // Update the chat box with conversation history
     function updateChatBox() {
