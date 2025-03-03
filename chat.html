@@ -3,163 +3,155 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat with OpenAI (via OpenRouter)</title>
+  <title>Chatbot Interface</title>
   <style>
-    /* General layout and background */
     body {
-      font-family: 'Arial', sans-serif;
-      background-color: #f1f1f1;
+      font-family: Arial, sans-serif;
       margin: 0;
       padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      overflow: hidden;
+      background-color: #f0f2f5;
     }
-
-    #chatbox {
+    #chatContainer {
       width: 100%;
       max-width: 600px;
-      background-color: #fff;
+      margin: 0 auto;
+      background-color: white;
       border-radius: 10px;
-      box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      height: 80vh;
       display: flex;
       flex-direction: column;
-      height: 80vh;
-      padding: 20px;
+      justify-content: space-between;
     }
-
-    #chatHistory {
+    #chatBox {
       flex-grow: 1;
       overflow-y: auto;
-      margin-bottom: 20px;
-      padding-right: 10px;
-    }
-
-    .message {
-      max-width: 70%;
       padding: 10px;
+      background-color: #f9f9f9;
+      border-radius: 8px;
       margin-bottom: 10px;
-      border-radius: 15px;
-      word-wrap: break-word;
+      max-height: 60vh;
     }
-
-    .user-message {
-      background-color: #d3f8e2;
-      align-self: flex-end;
-      text-align: right;
-    }
-
-    .bot-message {
-      background-color: #f1f1f1;
-      align-self: flex-start;
-      text-align: left;
-    }
-
     #userInput {
       width: 100%;
-      padding: 15px;
-      border-radius: 25px;
+      padding: 10px;
       border: 1px solid #ccc;
+      border-radius: 5px;
       font-size: 16px;
-      outline: none;
       margin-top: 10px;
-      transition: all 0.3s;
     }
-
-    #userInput:focus {
-      border-color: #4CAF50;
+    #sendMessage {
+      display: none;  /* We will not use this, as pressing Enter will submit the message */
     }
-
-    button {
-      display: none; /* Hide the button as 'Enter' is used */
+    .message {
+      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      max-width: 80%;
+    }
+    .userMessage {
+      background-color: #dcf8c6;
+      align-self: flex-end;
+    }
+    .botMessage {
+      background-color: #ffffff;
+      border: 1px solid #ccc;
+      align-self: flex-start;
+    }
+    .thinking {
+      text-align: center;
+      font-style: italic;
+      color: gray;
+      display: none;
+    }
+    .thinking.visible {
+      display: block;
     }
   </style>
 </head>
 <body>
-
-  <div id="chatbox">
-    <div id="chatHistory"></div>
-    <input type="text" id="userInput" placeholder="Ask me anything..." onkeydown="checkEnter(event)" />
+  <div id="chatContainer">
+    <div id="chatBox"></div>
+    <div id="thinking" class="thinking">AI is thinking...</div>
+    <textarea id="userInput" placeholder="Type your message..."></textarea>
   </div>
 
   <script>
-    // Retrieve the participantId and OpenRouterAPIKey from Qualtrics Embedded Data
-    const participantId = Qualtrics.SurveyEngine.getEmbeddedData("participantId");
-    const OpenRouterAPIKey = Qualtrics.SurveyEngine.getEmbeddedData("OpenRouterAPIKey");
-    const OpenAIEndpoint = Qualtrics.SurveyEngine.getEmbeddedData("OpenAIEndpoint");
-
-    // Initialize an empty chat history array (you can store more details as needed)
     let chatHistory = [];
 
-    // This function saves the chat history as embedded data in Qualtrics
-    function saveChatHistory() {
-      Qualtrics.SurveyEngine.setEmbeddedData("chatHistory", JSON.stringify(chatHistory));
-    }
+    // Get the embedded participant ID and store it
+    const participantId = "${e://Field/participantId}";  // Replace with embedded participant variable
 
-    // This function sends the message and processes the response
-    async function sendMessage() {
-      const userMessage = document.getElementById("userInput").value;
-      if (!userMessage.trim()) return; // Don't send if the input is empty
-
-      // Display user message in the chat history
-      updateChatHistory("You", userMessage);
-
-      // Send the message to OpenRouter, which will forward to OpenAI
-      const response = await sendToOpenRouter(userMessage);
-
-      // Display OpenAI's response
-      updateChatHistory("Bot", response);
-
-      // Save the updated chat history to Qualtrics
-      saveChatHistory();
-
-      // Clear the input field
-      document.getElementById("userInput").value = "";
-    }
-
-    // Function to update chat history on the UI
-    function updateChatHistory(sender, message) {
-      const chatHistoryDiv = document.getElementById("chatHistory");
-      chatHistory.push({ sender, message }); // Add to the chat history array
-      chatHistoryDiv.innerHTML = ''; // Clear previous content
-      chatHistory.forEach(chat => {
-        const messageDiv = document.createElement('div');
-        messageDiv.classList.add('message');
-        messageDiv.classList.add(chat.sender === "You" ? 'user-message' : 'bot-message');
-        messageDiv.innerHTML = `<strong>${chat.sender}:</strong> ${chat.message}`;
-        chatHistoryDiv.appendChild(messageDiv);
+    // Update the chat box with conversation history
+    function updateChatBox() {
+      const chatBox = document.getElementById("chatBox");
+      chatBox.innerHTML = ""; // Clear previous messages
+      chatHistory.forEach(message => {
+        const messageElement = document.createElement("div");
+        messageElement.classList.add("message", message.role === "user" ? "userMessage" : "botMessage");
+        messageElement.innerHTML = message.content;
+        chatBox.appendChild(messageElement);
       });
-      chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight; // Scroll to the latest message
+      chatBox.scrollTop = chatBox.scrollHeight; // Scroll to the latest message
     }
 
-    // Send user message to OpenRouter endpoint
-    async function sendToOpenRouter(userMessage) {
-      const response = await fetch(OpenAIEndpoint, {
-        method: "POST",
+    // Display thinking animation
+    function showThinkingAnimation() {
+      const thinking = document.getElementById("thinking");
+      thinking.classList.add("visible");
+    }
+
+    function hideThinkingAnimation() {
+      const thinking = document.getElementById("thinking");
+      thinking.classList.remove("visible");
+    }
+
+    // Send user message to OpenAI API via OpenRouter
+    async function sendToOpenAI(userMessage) {
+      // Show thinking animation
+      showThinkingAnimation();
+
+      const response = await fetch('https://your-openrouter-endpoint.com/proxy', { // Replace with OpenRouter endpoint
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${OpenRouterAPIKey}` // Add the API key to headers
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: userMessage,
-          participantId: participantId // Pass participantId to track chat session
-        })
+          prompt: userMessage,
+          history: chatHistory.map(msg => msg.content).join("\n"), // Provide history to OpenAI
+        }),
       });
 
       const data = await response.json();
-      return data.reply; // The reply from OpenAI (via OpenRouter)
+      const botMessage = data.reply; // Adjust based on your response format
+
+      // Add user message and bot message to history
+      chatHistory.push({ role: "user", content: userMessage });
+      chatHistory.push({ role: "bot", content: botMessage });
+
+      // Hide thinking animation and update the chat box
+      hideThinkingAnimation();
+      updateChatBox();
+
+      // Send the conversation history to Qualtrics as embedded data
+      Qualtrics.SurveyEngine.setEmbeddedData("chatHistory", JSON.stringify(chatHistory));
     }
 
-    // Check if the 'Enter' key was pressed and trigger sendMessage
-    function checkEnter(event) {
-      if (event.key === 'Enter') {
-        event.preventDefault(); // Prevent form submission on Enter key
-        sendMessage();
+    // Handle 'Enter' key to send message
+    document.getElementById("userInput").addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        const userMessage = document.getElementById("userInput").value.trim();
+        if (userMessage !== "") {
+          sendToOpenAI(userMessage);
+          document.getElementById("userInput").value = "";  // Clear input field
+        }
       }
-    }
-  </script>
+    });
 
+    // Initialize chat
+    updateChatBox();
+  </script>
 </body>
 </html>
